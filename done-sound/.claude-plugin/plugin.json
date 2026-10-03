@@ -1,0 +1,60 @@
+{
+  "name": "done-sound",
+  "version": "0.1.0",
+  "description": "Plays a macOS system sound when Claude finishes a turn",
+  "author": {
+    "name": "Vadym"
+  },
+  "userConfig": {
+    "sound": {
+      "type": "string",
+      "title": "Done sound",
+      "description": "System sound played when a turn finishes with an answer",
+      "default": "Glass",
+      "options": [
+        "Basso",
+        "Blow",
+        "Bottle",
+        "Frog",
+        "Funk",
+        "Glass",
+        "Hero",
+        "Morse",
+        "Ping",
+        "Pop",
+        "Purr",
+        "Sosumi",
+        "Submarine",
+        "Tink"
+      ]
+    },
+    "errorSound": {
+      "type": "string",
+      "title": "Error sound",
+      "description": "System sound played when a turn ends on an error or refusal",
+      "default": "Basso",
+      "options": [
+        "Basso",
+        "Blow",
+        "Bottle",
+        "Frog",
+        "Funk",
+        "Glass",
+        "Hero",
+        "Morse",
+        "Ping",
+        "Pop",
+        "Purr",
+        "Sosumi",
+        "Submarine",
+        "Tink"
+      ]
+    },
+    "minSeconds": {
+      "type": "number",
+      "title": "Minimum turn length (seconds)",
+      "description": "Stay silent for turns shorter than this",
+      "default": 0
+    }
+  }
+}

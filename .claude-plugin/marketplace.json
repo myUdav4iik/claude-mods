@@ -1,0 +1,21 @@
+{
+  "name": "claude-mods",
+  "owner": {
+    "name": "Vadym"
+  },
+  "metadata": {
+    "description": "Personal Claude Code mods"
+  },
+  "plugins": [
+    {
+      "name": "context-bar",
+      "source": "./context-bar",
+      "description": "A context-window breakdown bar above the prompt, toggled with /context-bar"
+    },
+    {
+      "name": "done-sound",
+      "source": "./done-sound",
+      "description": "Plays a macOS system sound when Claude finishes a turn"
+    }
+  ]
+}
