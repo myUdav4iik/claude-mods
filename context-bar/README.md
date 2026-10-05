@@ -2,13 +2,13 @@
 
 A live breakdown of the context window, drawn in the band above Claude Code's prompt.
 
-```text
-◆ context  18%  178k/1M · compacts 967k
-▆▆▆▆▆▆▆▆▆▆▆▆────────────────────────────────────────────────────────────
-■ system 4.6k  ■ tools 24.7k  ■ mcp 19.2k  ■ mcp instr 1.9k  ■ agents 38
-■ memory 1.3k  ■ skills 10k  ■ messages 117k  ─ free 789k
-◆ usage  5h 23% · resets in 2h 14m  7d 81% · resets in 3d 4h
-```
+In the terminal:
+
+![context-bar in the terminal: a context header at 18%, the category bar, its legend, and a usage row with 5h and 7d limits](screenshots/terminal.png)
+
+In the desktop app:
+
+![context-bar in the Claude desktop app: a context header at 35%, the category bar on a dark free-space fill, and its legend](screenshots/desktop.png)
 
 - **Header:** the share of the window in use, as a badge that is green under 50%, yellow under 80% and red above. Then the tokens in use, the window size, and the point where auto-compaction runs.
 - **Bar:** one segment per category, in proportion to its share of the window, followed by a track for the free space.

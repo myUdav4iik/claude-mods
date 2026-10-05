@@ -4,8 +4,10 @@ Mods for [Claude Code](https://code.claude.com): plugins with a hooks module tha
 
 | Mod | What it does |
 | --- | --- |
-| [`context-bar`](context-bar/) | A bar above the prompt that breaks the context window down by category, like a live `/context`. Toggle it with `/context-bar`. |
+| [`context-bar`](context-bar/) | A bar above the prompt that breaks the context window down by category, like a live `/context`, with your plan's usage limits below it. Toggle it with `/context-bar`. |
 | [`done-sound`](done-sound/) | Plays a macOS system sound when Claude finishes a reply, and a different one when a turn ends on an error. Mute it with `/sound off`. |
+
+![context-bar in the terminal](context-bar/screenshots/terminal.png)
 
 ## Requirements
 
