@@ -7,11 +7,13 @@ A live breakdown of the context window, drawn in the band above Claude Code's pr
 ▆▆▆▆▆▆▆▆▆▆▆▆────────────────────────────────────────────────────────────
 ■ system 4.6k  ■ tools 24.7k  ■ mcp 19.2k  ■ mcp instr 1.9k  ■ agents 38
 ■ memory 1.3k  ■ skills 10k  ■ messages 117k  ─ free 789k
+◆ usage  5h 23% · resets in 2h 14m  7d 81% · resets in 3d 4h
 ```
 
 - **Header:** the share of the window in use, as a badge that is green under 50%, yellow under 80% and red above. Then the tokens in use, the window size, and the point where auto-compaction runs.
 - **Bar:** one segment per category, in proportion to its share of the window, followed by a track for the free space.
 - **Legend:** each category with its token count, in the colours `/context` uses.
+- **Usage:** your plan's rate-limit windows (`5h`, `7d`, or a gateway's `spend` limit), each with the share used, coloured like the context badge, and a countdown to when it resets. The row only appears on a subscription, where Claude Code receives these figures.
 
 ## Usage
 
@@ -27,12 +29,13 @@ The command runs at once, even while Claude is working. The choice is remembered
 
 | Hook | What it does |
 | --- | --- |
-| `session.start` | Registers `/context-bar`, restores the saved on/off choice, and takes a first reading. |
+| `session.start` | Registers `/context-bar`, restores the saved on/off choice, takes a first reading, and starts a once-a-minute timer for the reset countdowns. |
 | `turn.complete` | Takes a reading after each turn of the main conversation. Subagent turns are skipped. |
 | `session.compact` | Takes a reading after the conversation is compacted. |
+| `session.measure` | Updates the usage row when a rate-limit window moves, between turns too. |
 | `ui.render` on `AbovePrompt` | Draws the band. It steps aside while Claude Code shows a survey there. |
 
-Readings come from `$.session.usage({ breakdown: 'summary' })`, the same per-category breakdown `/context` shows. The `summary` mode estimates locally, so a reading sends no requests and costs nothing.
+Readings come from `$.session.usage({ breakdown: 'summary' })`, the same per-category breakdown `/context` shows. The `summary` mode estimates locally, so a reading sends no requests and costs nothing. The same call returns the rate-limit windows from the last API response; the usage row shows those, so it sends no requests either.
 
 The bar is built from flex boxes, each growing by its share of the window, so it splits in exact proportion at any width and never wraps. Small categories still get at least one cell. Free space is drawn differently per surface:
 
@@ -45,6 +48,7 @@ The compaction reserve is drawn as part of the free track; the header shows wher
 
 - **Estimates:** the category figures are estimates, as in `/context`, so the total can differ slightly from the status line.
 - **Once per turn:** the bar updates after each turn, not while Claude is working.
+- **Usage after a reset:** the percentages come from the last API response. Once a window's reset time passes, the row shows "resetting" until the next response brings a new figure.
 - **Before the first reply:** the bar shows "waiting for the first reading…".
 - **Shared band:** the band above the prompt holds one mod at a time. If another installed mod draws there, only one of them shows.
 

@@ -1,10 +1,13 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
-import type { Segment, Snapshot } from '../types'
+import type { Limit, Segment, Snapshot } from '../types'
 
 const snapshot = atom({ plugin: 'context-bar', key: 'snapshot' } as const, null)
 const isShown = atom({ plugin: 'context-bar', key: 'isShown' } as const, true)
+const limits = atom({ plugin: 'context-bar', key: 'limits' } as const, [] as Limit[])
+// The time the reset countdowns are measured from, moved on once a minute.
+const now = atom({ plugin: 'context-bar', key: 'now' } as const, 0)
 
 // Persisted across sessions, so the bar stays hidden once turned off.
 const SHOWN_KEY = 'isShown'
@@ -22,6 +25,14 @@ const LABELS: Record<string, string> = {
   'memory files': 'memory',
 }
 
+// Short names for the rate-limit windows; others show with spaces for underscores.
+const LIMIT_LABELS: Record<string, string> = {
+  five_hour: '5h',
+  seven_day: '7d',
+  spend_limit: 'spend',
+}
+const TICK_MS = 60_000
+
 const short = (n: number) => {
   if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${+(n / 1_000).toFixed(n >= 100_000 ? 0 : 1)}k`
@@ -35,9 +46,43 @@ const growOf = (tokens: number, max: number) => Math.min(10_000, (tokens / max) 
 const badgeColor = (percent: number) =>
   percent < 50 ? 'success' : percent < 80 ? 'warning' : 'error'
 
+// Time left as `45m`, `2h 14m` or `3d 4h`, rounded up to the minute; null once
+// it has passed.
+const until = (ms: number) => {
+  const minutes = Math.ceil(ms / 60_000)
+  if (minutes <= 0) return null
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  return hours % 24 ? `${days}d ${hours % 24}h` : `${days}d`
+}
+
+const toLimits = (windows: readonly SessionRateLimit[]): Limit[] =>
+  windows.map(w => {
+    const resetsAt = w.resetsAt === undefined ? NaN : Date.parse(w.resetsAt)
+    return { kind: w.kind, percent: w.percentUsed, resetsAt: Number.isNaN(resetsAt) ? null : resetsAt }
+  })
+
+const setLimits = async ($: EngineInterface, windows: readonly SessionRateLimit[]) => {
+  const time = await $.clock.now()
+  await update($, now, () => time)
+  await update($, limits, () => toLimits(windows))
+}
+
+// Moves the countdowns on; skipped while there is nothing on screen to move.
+const tick = async ($: EngineInterface) => {
+  if (!(await read($, isShown)) || !(await read($, limits)).some(l => l.resetsAt !== null)) {
+    return
+  }
+  const time = await $.clock.now()
+  await update($, now, () => time)
+}
+
 const refresh = async ($: EngineInterface) => {
   try {
-    const { context } = await $.session.usage({ breakdown: 'summary' })
+    const { context, rateLimits } = await $.session.usage({ breakdown: 'summary' })
+    await setLimits($, rateLimits)
     const b = context.breakdown
     if (!b) {
       return
@@ -82,6 +127,7 @@ export const register: Register = on => {
     const stored = await $.store.get(SHOWN_KEY)
     await update($, isShown, () => stored !== false)
     $.clock.after(0, () => void refresh($))
+    $.clock.every(TICK_MS, () => void tick($))
 
     return result
   })
@@ -113,19 +159,57 @@ export const register: Register = on => {
     return result
   })
 
+  // Rate-limit windows move between turns too; the engine pushes them here.
+  on('session.measure', async ($, e, next) => {
+    const result = await next(e)
+    if (e.changed.includes('rateLimits')) {
+      await setLimits($, e.rateLimits)
+    }
+    return result
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !(await read($, isShown))) {
       return next(e)
     }
     const { Box, Text } = $.ui.resolve(e)
     const snap = await read($, snapshot)
+    const windows = await read($, limits)
+    const time = await read($, now)
+
+    // One row of plan usage, each window with its share used and when it
+    // resets. Absent off a subscription, where no window is reported.
+    const usage = windows.length > 0 && (
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
+        <Box key="usage-head" flexDirection="row">
+          <Text color={ACCENT}>◆ </Text>
+          <Text bold>usage</Text>
+        </Box>
+        {windows.map((l, i) => {
+          const percent = Math.round(l.percent)
+          const left = l.resetsAt === null ? null : until(l.resetsAt - time)
+          return (
+            <Box key={`lim${i}`} flexDirection="row">
+              <Text dimColor>{LIMIT_LABELS[l.kind] ?? l.kind.replace(/_/g, ' ')} </Text>
+              <Text bold color={badgeColor(percent)}>{`${percent}%`}</Text>
+              {l.resetsAt !== null && (
+                <Text dimColor>{left === null ? ' · resetting' : ` · resets in ${left}`}</Text>
+              )}
+            </Box>
+          )
+        })}
+      </Box>
+    )
 
     if (snap === null || snap.max <= 0) {
       return (
-        <Box paddingX={1}>
-          <Text color={ACCENT}>◆ </Text>
-          <Text bold>context</Text>
-          <Text dimColor>  waiting for the first reading…</Text>
+        <Box flexDirection="column" paddingX={1}>
+          <Box flexDirection="row">
+            <Text color={ACCENT}>◆ </Text>
+            <Text bold>context</Text>
+            <Text dimColor>  waiting for the first reading…</Text>
+          </Box>
+          {usage}
         </Box>
       )
     }
@@ -196,6 +280,7 @@ export const register: Register = on => {
             </Box>
           )}
         </Box>
+        {usage}
       </Box>
     )
   })
